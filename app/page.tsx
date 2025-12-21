@@ -3,6 +3,12 @@
 import { useEffect, useState } from 'react';
 import { TASKS, ZONES } from '../lib/tasksData';
 
+interface CompletedTask {
+  taskId: number;
+  completedAt: string;
+  date: string;
+}
+
 function requestNotificationPermission() {
   return new Promise<boolean>((resolve) => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -28,12 +34,58 @@ export default function Home() {
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [completedTasks, setCompletedTasks] = useState<Set<number>>(new Set());
   const [filterFrequency, setFilterFrequency] = useState<string>('all');
+  const [darkMode, setDarkMode] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [history, setHistory] = useState<CompletedTask[]>([]);
 
+  // 1️⃣ PERSISTANCE LOCALSTORAGE
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      setNotificationEnabled(true);
+    if (typeof window !== 'undefined') {
+      // Charger tâches du jour
+      const today = new Date().toISOString().split('T')[0];
+      const saved = localStorage.getItem(`tasks-${today}`);
+      if (saved) {
+        setCompletedTasks(new Set(JSON.parse(saved)));
+      }
+
+      // Charger historique
+      const savedHistory = localStorage.getItem('tasks-history');
+      if (savedHistory) {
+        setHistory(JSON.parse(savedHistory));
+      }
+
+      // Charger mode sombre
+      const savedDarkMode = localStorage.getItem('darkMode');
+      if (savedDarkMode === 'true') {
+        setDarkMode(true);
+      }
+
+      // Charger notifications
+      if ('Notification' in window && Notification.permission === 'granted') {
+        setNotificationEnabled(true);
+      }
     }
   }, []);
+
+  // Sauvegarder au changement
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(`tasks-${today}`, JSON.stringify([...completedTasks]));
+    }
+  }, [completedTasks]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tasks-history', JSON.stringify(history));
+    }
+  }, [history]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('darkMode', darkMode.toString());
+    }
+  }, [darkMode]);
 
   const handleEnableNotifications = async () => {
     const granted = await requestNotificationPermission();
@@ -41,16 +93,59 @@ export default function Home() {
   };
 
   const toggleTaskCompletion = (taskId: number) => {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+    
     setCompletedTasks(prev => {
       const newSet = new Set(prev);
       if (newSet.has(taskId)) {
         newSet.delete(taskId);
+        // Retirer de l'historique
+        setHistory(h => h.filter(item => !(item.taskId === taskId && item.date === today)));
       } else {
         newSet.add(taskId);
+        // Ajouter à l'historique
+        setHistory(h => [...h, { taskId, completedAt: now, date: today }]);
       }
       return newSet;
     });
   };
+
+  // 2️⃣ STATISTIQUES
+  const getLast7Days = () => {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      days.push(date.toISOString().split('T')[0]);
+    }
+    return days;
+  };
+
+  const getStatsForLast7Days = () => {
+    const days = getLast7Days();
+    return days.map(date => ({
+      date,
+      count: history.filter(h => h.date === date).length,
+      label: new Date(date).toLocaleDateString('fr-FR', { weekday: 'short' })
+    }));
+  };
+
+  const stats7Days = getStatsForLast7Days();
+  const maxCount = Math.max(...stats7Days.map(s => s.count), 1);
+  const totalThisWeek = stats7Days.reduce((sum, s) => sum + s.count, 0);
+  const streakDays = (() => {
+    let streak = 0;
+    const days = getLast7Days().reverse();
+    for (const date of days) {
+      if (history.some(h => h.date === date)) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  })();
 
   let zoneTasks = selectedZone ? TASKS.filter(t => t.zone === selectedZone) : [];
   if (filterFrequency !== 'all') {
@@ -59,14 +154,61 @@ export default function Home() {
 
   const frequencies = ['quotidienne', 'hebdomadaire', 'mensuelle', 'saisonnière', 'annuelle', 'trimestrielle'];
 
+  // 3️⃣ THÈME
+  const theme = {
+    bg: darkMode ? '#0f172a' : '#f8fafc',
+    cardBg: darkMode ? '#1e293b' : '#ffffff',
+    text: darkMode ? '#f1f5f9' : '#1e293b',
+    textSecondary: darkMode ? '#94a3b8' : '#64748b',
+    border: darkMode ? '#334155' : '#e2e8f0',
+    gradientFrom: darkMode ? '#1e3a8a' : '#e3f2fd',
+    gradientTo: darkMode ? '#3730a3' : '#bbdefb',
+  };
+
   return (
     <main style={{ 
       padding: '2rem 1rem', 
       maxWidth: '1200px', 
       margin: '0 auto',
-      minHeight: '100vh'
+      minHeight: '100vh',
+      background: theme.bg,
+      transition: 'background 0.3s ease'
     }}>
-      <header style={{ textAlign: 'center', padding: '2rem 0' }}>
+      {/* HEADER */}
+      <header style={{ textAlign: 'center', padding: '2rem 0', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', gap: '1rem' }}>
+          <button
+            onClick={() => setShowStats(!showStats)}
+            style={{
+              padding: '0.5rem 1rem',
+              background: showStats ? '#3b82f6' : theme.cardBg,
+              color: showStats ? 'white' : theme.text,
+              border: `2px solid ${theme.border}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '1.5rem'
+            }}
+            title="Statistiques"
+          >
+            📊
+          </button>
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            style={{
+              padding: '0.5rem 1rem',
+              background: theme.cardBg,
+              color: theme.text,
+              border: `2px solid ${theme.border}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '1.5rem'
+            }}
+            title={darkMode ? 'Mode clair' : 'Mode sombre'}
+          >
+            {darkMode ? '☀️' : '🌙'}
+          </button>
+        </div>
+
         <h1 style={{ 
           fontSize: 'clamp(2rem, 5vw, 4rem)', 
           fontWeight: '800', 
@@ -77,24 +219,95 @@ export default function Home() {
         }}>
           🏠 CleanHome Pro
         </h1>
-        <p style={{ fontSize: '1.2rem', color: '#64748b', marginBottom: '1rem' }}>
+        <p style={{ fontSize: '1.2rem', color: theme.textSecondary, marginBottom: '1rem' }}>
           Votre assistant ménage intelligent avec <strong>{TASKS.length} tâches</strong>
         </p>
-        <p style={{ fontSize: '0.95rem', color: '#94a3b8' }}>
-          ✅ {completedTasks.size} tâches complétées aujourd'hui
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', flexWrap: 'wrap' }}>
+          <p style={{ fontSize: '0.95rem', color: theme.textSecondary }}>
+            ✅ {completedTasks.size} tâches aujourd'hui
+          </p>
+          <p style={{ fontSize: '0.95rem', color: theme.textSecondary }}>
+            📅 {totalThisWeek} cette semaine
+          </p>
+          <p style={{ fontSize: '0.95rem', color: theme.textSecondary }}>
+            🔥 {streakDays} jour{streakDays > 1 ? 's' : ''} de suite
+          </p>
+        </div>
       </header>
+
+      {/* STATISTIQUES */}
+      {showStats && (
+        <div style={{ 
+          background: theme.cardBg, 
+          borderRadius: '16px', 
+          padding: '2rem', 
+          marginBottom: '2rem',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+          border: `1px solid ${theme.border}`
+        }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: theme.text, marginBottom: '1.5rem' }}>
+            📊 Statistiques - 7 derniers jours
+          </h2>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '200px', gap: '0.5rem', marginBottom: '2rem' }}>
+            {stats7Days.map((stat, idx) => (
+              <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ 
+                  fontSize: '0.85rem', 
+                  fontWeight: '600',
+                  color: theme.text,
+                  marginBottom: '0.25rem'
+                }}>
+                  {stat.count}
+                </div>
+                <div style={{ 
+                  width: '100%',
+                  height: `${(stat.count / maxCount) * 150}px`,
+                  background: stat.count > 0 ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : theme.border,
+                  borderRadius: '8px 8px 0 0',
+                  transition: 'height 0.3s ease',
+                  minHeight: '10px'
+                }} />
+                <div style={{ fontSize: '0.75rem', color: theme.textSecondary, textTransform: 'capitalize' }}>
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+            <div style={{ background: theme.bg, padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#3b82f6' }}>{totalThisWeek}</div>
+              <div style={{ fontSize: '0.85rem', color: theme.textSecondary }}>Total semaine</div>
+            </div>
+            <div style={{ background: theme.bg, padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#10b981' }}>{completedTasks.size}</div>
+              <div style={{ fontSize: '0.85rem', color: theme.textSecondary }}>Aujourd'hui</div>
+            </div>
+            <div style={{ background: theme.bg, padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#f59e0b' }}>{streakDays}</div>
+              <div style={{ fontSize: '0.85rem', color: theme.textSecondary }}>Jours de suite</div>
+            </div>
+            <div style={{ background: theme.bg, padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#8b5cf6' }}>{history.length}</div>
+              <div style={{ fontSize: '0.85rem', color: theme.textSecondary }}>Total historique</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!selectedZone ? (
         <>
+          {/* ZONES */}
           <div style={{ 
-            background: 'white', 
+            background: theme.cardBg, 
             borderRadius: '16px', 
             padding: '2rem', 
             marginBottom: '2rem',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+            boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+            border: `1px solid ${theme.border}`
           }}>
-            <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#1e293b', marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: theme.text, marginBottom: '1.5rem' }}>
               📍 Zones disponibles ({ZONES.length} zones)
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
@@ -108,13 +321,13 @@ export default function Home() {
                     key={zone} 
                     onClick={() => setSelectedZone(zone)}
                     style={{ 
-                      background: 'linear-gradient(135deg, #e3f2fd, #bbdefb)',
+                      background: `linear-gradient(135deg, ${theme.gradientFrom}, ${theme.gradientTo})`,
                       padding: '1.5rem',
                       borderRadius: '12px',
                       textAlign: 'center',
                       cursor: 'pointer',
                       transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                      border: '2px solid transparent',
+                      border: `2px solid ${theme.border}`,
                       position: 'relative',
                       overflow: 'hidden'
                     }}
@@ -130,10 +343,10 @@ export default function Home() {
                         transition: 'width 0.3s ease'
                       }} />
                     )}
-                    <h3 style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '0.5rem' }}>
+                    <h3 style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '0.5rem', color: theme.text }}>
                       {zone}
                     </h3>
-                    <p style={{ fontSize: '1.1rem', color: '#475569', marginBottom: '0.5rem' }}>
+                    <p style={{ fontSize: '1.1rem', color: theme.textSecondary, marginBottom: '0.5rem' }}>
                       {taskCount} tâches
                     </p>
                     {percentage > 0 && (
@@ -147,8 +360,9 @@ export default function Home() {
             </div>
           </div>
 
-          <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-            <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#1e293b', marginBottom: '1.5rem' }}>
+          {/* NOTIFICATIONS */}
+          <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '2rem', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', border: `1px solid ${theme.border}` }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: theme.text, marginBottom: '1.5rem' }}>
               🔔 Notifications Push
             </h2>
             {!notificationEnabled ? (
@@ -163,11 +377,8 @@ export default function Home() {
                   borderRadius: '12px',
                   fontSize: '1.1rem',
                   fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'transform 0.2s'
+                  cursor: 'pointer'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
               >
                 🔔 Activer les rappels quotidiens à 20h
               </button>
@@ -188,18 +399,19 @@ export default function Home() {
         </>
       ) : (
         <div style={{ 
-          background: 'white', 
+          background: theme.cardBg, 
           borderRadius: '16px', 
           padding: '2rem',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+          border: `1px solid ${theme.border}`
         }}>
           <button 
             onClick={() => setSelectedZone(null)}
             style={{
               padding: '0.5rem 1.5rem',
-              background: '#64748b',
-              color: 'white',
-              border: 'none',
+              background: theme.bg,
+              color: theme.text,
+              border: `2px solid ${theme.border}`,
               borderRadius: '8px',
               fontSize: '1rem',
               fontWeight: '600',
@@ -211,7 +423,7 @@ export default function Home() {
           </button>
           
           <div style={{ marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#1e293b', marginBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: theme.text, marginBottom: '1rem' }}>
               {selectedZone} - {zoneTasks.length} tâche{zoneTasks.length > 1 ? 's' : ''}
             </h2>
             
@@ -220,9 +432,9 @@ export default function Home() {
                 onClick={() => setFilterFrequency('all')}
                 style={{
                   padding: '0.5rem 1rem',
-                  background: filterFrequency === 'all' ? '#3b82f6' : '#e2e8f0',
-                  color: filterFrequency === 'all' ? 'white' : '#64748b',
-                  border: 'none',
+                  background: filterFrequency === 'all' ? '#3b82f6' : theme.bg,
+                  color: filterFrequency === 'all' ? 'white' : theme.text,
+                  border: `2px solid ${theme.border}`,
                   borderRadius: '6px',
                   fontSize: '0.9rem',
                   fontWeight: '600',
@@ -237,9 +449,9 @@ export default function Home() {
                   onClick={() => setFilterFrequency(freq)}
                   style={{
                     padding: '0.5rem 1rem',
-                    background: filterFrequency === freq ? '#3b82f6' : '#e2e8f0',
-                    color: filterFrequency === freq ? 'white' : '#64748b',
-                    border: 'none',
+                    background: filterFrequency === freq ? '#3b82f6' : theme.bg,
+                    color: filterFrequency === freq ? 'white' : theme.text,
+                    border: `2px solid ${theme.border}`,
                     borderRadius: '6px',
                     fontSize: '0.9rem',
                     fontWeight: '600',
@@ -261,11 +473,11 @@ export default function Home() {
                   key={task.id}
                   onClick={() => toggleTaskCompletion(task.id)}
                   style={{
-                    background: isCompleted ? '#e8f5e9' : '#f8f9fa',
+                    background: isCompleted ? (darkMode ? '#1e3a1e' : '#e8f5e9') : theme.bg,
                     padding: '1.5rem',
                     borderRadius: '12px',
                     cursor: 'pointer',
-                    border: isCompleted ? '2px solid #4caf50' : '2px solid #e0e0e0',
+                    border: isCompleted ? '2px solid #4caf50' : `2px solid ${theme.border}`,
                     transition: 'all 0.3s ease'
                   }}
                 >
@@ -274,8 +486,8 @@ export default function Home() {
                       width: '24px',
                       height: '24px',
                       borderRadius: '50%',
-                      border: isCompleted ? '2px solid #4caf50' : '2px solid #cbd5e1',
-                      background: isCompleted ? '#4caf50' : 'white',
+                      border: isCompleted ? '2px solid #4caf50' : `2px solid ${theme.border}`,
+                      background: isCompleted ? '#4caf50' : 'transparent',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -288,7 +500,7 @@ export default function Home() {
                       <h3 style={{ 
                         fontSize: '1.1rem', 
                         fontWeight: '600', 
-                        color: isCompleted ? '#2e7d32' : '#1e293b',
+                        color: isCompleted ? '#4caf50' : theme.text,
                         textDecoration: isCompleted ? 'line-through' : 'none',
                         marginBottom: '0.5rem'
                       }}>
@@ -297,8 +509,8 @@ export default function Home() {
                       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                         <span style={{
                           padding: '0.25rem 0.75rem',
-                          background: '#e3f2fd',
-                          color: '#1565c0',
+                          background: darkMode ? '#1e3a8a' : '#e3f2fd',
+                          color: darkMode ? '#93c5fd' : '#1565c0',
                           borderRadius: '6px',
                           fontSize: '0.85rem',
                           fontWeight: '600',
@@ -309,8 +521,8 @@ export default function Home() {
                         {task.estimatedTime && (
                           <span style={{
                             padding: '0.25rem 0.75rem',
-                            background: '#fff3e0',
-                            color: '#e65100',
+                            background: darkMode ? '#7c2d12' : '#fff3e0',
+                            color: darkMode ? '#fdba74' : '#e65100',
                             borderRadius: '6px',
                             fontSize: '0.85rem',
                             fontWeight: '600'
