@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { TASKS, ZONES } from '../lib/tasksData';
+import { getScheduledTasksForMonth, getTasksForDate, ScheduledTask } from '../lib/calendarUtils';
 
 interface CompletedTask {
   taskId: number;
@@ -36,9 +37,15 @@ export default function Home() {
   const [filterFrequency, setFilterFrequency] = useState<string>('all');
   const [darkMode, setDarkMode] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [history, setHistory] = useState<CompletedTask[]>([]);
+  
+  // Calendrier
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
 
-  // 1️⃣ PERSISTANCE LOCALSTORAGE
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const today = new Date().toISOString().split('T')[0];
@@ -62,6 +69,12 @@ export default function Home() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    // Générer les tâches planifiées pour le mois
+    const scheduled = getScheduledTasksForMonth(currentYear, currentMonth, TASKS);
+    setScheduledTasks(scheduled);
+  }, [currentMonth, currentYear]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -139,6 +152,35 @@ export default function Home() {
     return streak;
   })();
 
+  // Calendrier
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+  const adjustedFirstDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; // Lundi = 0
+
+  const prevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear(currentYear - 1);
+    } else {
+      setCurrentMonth(currentMonth - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear(currentYear + 1);
+    } else {
+      setCurrentMonth(currentMonth + 1);
+    }
+  };
+
+  const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+  const dayNames = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+  const today = new Date().toISOString().split('T')[0];
+  const selectedDateTasks = selectedDate ? getTasksForDate(selectedDate, scheduledTasks) : [];
+
   let zoneTasks = selectedZone ? TASKS.filter(t => t.zone === selectedZone) : [];
   if (filterFrequency !== 'all') {
     zoneTasks = zoneTasks.filter(t => t.frequency === filterFrequency);
@@ -165,9 +207,8 @@ export default function Home() {
       background: theme.bg,
       transition: 'background 0.3s ease'
     }}>
-      {/* HEADER RESPONSIVE - CORRIGÉ */}
+      {/* HEADER */}
       <header style={{ padding: '1rem 0', marginBottom: '1rem' }}>
-        {/* Titre centré */}
         <h1 style={{ 
           fontSize: 'clamp(1.8rem, 7vw, 4rem)', 
           fontWeight: '800', 
@@ -181,15 +222,36 @@ export default function Home() {
           🏠 CleanHome Pro
         </h1>
 
-        {/* Boutons EN DESSOUS du titre */}
         <div style={{ 
           display: 'flex', 
           justifyContent: 'center', 
           gap: '0.5rem',
-          marginBottom: '1rem'
+          marginBottom: '1rem',
+          flexWrap: 'wrap'
         }}>
           <button
-            onClick={() => setShowStats(!showStats)}
+            onClick={() => {
+              setShowCalendar(!showCalendar);
+              setShowStats(false);
+            }}
+            style={{
+              padding: '0.5rem 1rem',
+              background: showCalendar ? '#3b82f6' : theme.cardBg,
+              color: showCalendar ? 'white' : theme.text,
+              border: `2px solid ${theme.border}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '1.3rem'
+            }}
+            title="Calendrier"
+          >
+            📅
+          </button>
+          <button
+            onClick={() => {
+              setShowStats(!showStats);
+              setShowCalendar(false);
+            }}
             style={{
               padding: '0.5rem 1rem',
               background: showStats ? '#3b82f6' : theme.cardBg,
@@ -220,12 +282,10 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Description */}
         <p style={{ fontSize: '1rem', color: theme.textSecondary, marginBottom: '0.75rem', textAlign: 'center' }}>
           <strong>{TASKS.length} tâches</strong> organisées
         </p>
 
-        {/* Stats rapides */}
         <div style={{ 
           display: 'flex', 
           justifyContent: 'center', 
@@ -239,6 +299,200 @@ export default function Home() {
           <span>🔥 {streakDays} jour{streakDays > 1 ? 's' : ''}</span>
         </div>
       </header>
+
+      {/* CALENDRIER */}
+      {showCalendar && (
+        <div style={{ 
+          background: theme.cardBg, 
+          borderRadius: '16px', 
+          padding: '1.5rem', 
+          marginBottom: '1rem',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+          border: `1px solid ${theme.border}`
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <button onClick={prevMonth} style={{
+              padding: '0.5rem 1rem',
+              background: theme.bg,
+              color: theme.text,
+              border: `2px solid ${theme.border}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '1.2rem'
+            }}>
+              ←
+            </button>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: theme.text }}>
+              {monthNames[currentMonth]} {currentYear}
+            </h2>
+            <button onClick={nextMonth} style={{
+              padding: '0.5rem 1rem',
+              background: theme.bg,
+              color: theme.text,
+              border: `2px solid ${theme.border}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '1.2rem'
+            }}>
+              →
+            </button>
+          </div>
+
+          {/* Jours de la semaine */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.25rem', marginBottom: '0.5rem' }}>
+            {dayNames.map(day => (
+              <div key={day} style={{ 
+                textAlign: 'center', 
+                fontWeight: '600', 
+                fontSize: '0.75rem',
+                color: theme.textSecondary,
+                padding: '0.5rem 0'
+              }}>
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Grille du calendrier */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.25rem' }}>
+            {/* Cases vides avant le 1er du mois */}
+            {Array.from({ length: adjustedFirstDay }).map((_, i) => (
+              <div key={`empty-${i}`} style={{ aspectRatio: '1', background: theme.bg, borderRadius: '8px' }} />
+            ))}
+            
+            {/* Jours du mois */}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const tasksForDay = getTasksForDate(dateStr, scheduledTasks);
+              const isToday = dateStr === today;
+              const isSelected = dateStr === selectedDate;
+              const completedForDay = history.filter(h => h.date === dateStr).length;
+              
+              return (
+                <div 
+                  key={day}
+                  onClick={() => setSelectedDate(dateStr)}
+                  style={{
+                    aspectRatio: '1',
+                    background: isSelected ? '#3b82f6' : isToday ? theme.gradientFrom : theme.bg,
+                    border: isToday ? `2px solid #3b82f6` : `1px solid ${theme.border}`,
+                    borderRadius: '8px',
+                    padding: '0.25rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ 
+                    fontSize: '0.9rem', 
+                    fontWeight: isToday ? '700' : '500',
+                    color: isSelected ? 'white' : theme.text
+                  }}>
+                    {day}
+                  </div>
+                  {tasksForDay.length > 0 && (
+                    <div style={{
+                      fontSize: '0.65rem',
+                      color: isSelected ? 'white' : '#3b82f6',
+                      fontWeight: '600'
+                    }}>
+                      {tasksForDay.length}
+                    </div>
+                  )}
+                  {completedForDay > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '2px',
+                      right: '2px',
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: '#4caf50'
+                    }} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Tâches du jour sélectionné */}
+          {selectedDate && (
+            <div style={{ marginTop: '1.5rem', padding: '1rem', background: theme.bg, borderRadius: '12px' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: '600', color: theme.text, marginBottom: '1rem' }}>
+                📋 {new Date(selectedDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </h3>
+              {selectedDateTasks.length === 0 ? (
+                <p style={{ color: theme.textSecondary, fontSize: '0.9rem' }}>Aucune tâche planifiée</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {selectedDateTasks.map((task, idx) => {
+                    const isCompleted = history.some(h => h.taskId === task.taskId && h.date === selectedDate);
+                    return (
+                      <div 
+                        key={idx}
+                        style={{
+                          padding: '1rem',
+                          background: isCompleted ? (darkMode ? '#1e3a1e' : '#e8f5e9') : theme.cardBg,
+                          border: isCompleted ? '2px solid #4caf50' : `1px solid ${theme.border}`,
+                          borderRadius: '8px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          {isCompleted && <span style={{ color: '#4caf50' }}>✓</span>}
+                          <span style={{ 
+                            fontWeight: '600', 
+                            fontSize: '0.95rem',
+                            color: isCompleted ? '#4caf50' : theme.text,
+                            textDecoration: isCompleted ? 'line-through' : 'none'
+                          }}>
+                            {task.taskName}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.75rem', flexWrap: 'wrap' }}>
+                          <span style={{ 
+                            padding: '0.2rem 0.5rem', 
+                            background: darkMode ? '#1e3a8a' : '#e3f2fd',
+                            color: darkMode ? '#93c5fd' : '#1565c0',
+                            borderRadius: '4px',
+                            fontWeight: '600'
+                          }}>
+                            {task.zone}
+                          </span>
+                          <span style={{ 
+                            padding: '0.2rem 0.5rem', 
+                            background: darkMode ? '#065f46' : '#d1fae5',
+                            color: darkMode ? '#6ee7b7' : '#047857',
+                            borderRadius: '4px',
+                            fontWeight: '600'
+                          }}>
+                            {task.frequency}
+                          </span>
+                          {task.estimatedTime && (
+                            <span style={{ 
+                              padding: '0.2rem 0.5rem', 
+                              background: darkMode ? '#7c2d12' : '#fff3e0',
+                              color: darkMode ? '#fdba74' : '#e65100',
+                              borderRadius: '4px',
+                              fontWeight: '600'
+                            }}>
+                              ⏱ {task.estimatedTime}m
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* STATISTIQUES */}
       {showStats && (
@@ -311,7 +565,7 @@ export default function Home() {
             border: `1px solid ${theme.border}`
           }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: theme.text, marginBottom: '1rem' }}>
-              📍 {ZONES.length} Zones
+              �� {ZONES.length} Zones
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
               {ZONES.map((zone) => {
