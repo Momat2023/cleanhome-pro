@@ -1,12 +1,18 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "CleanHome Pro - Assistant Ménage",
-  description: "Gérez vos 100 tâches de nettoyage avec rappels intelligents",
+  description: "Gérez vos 250 tâches de nettoyage avec rappels intelligents",
   manifest: "/manifest.json",
+};
+
+export const viewport: Viewport = {
   themeColor: "#3b82f6",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -19,7 +25,6 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <meta name="theme-color" content="#3b82f6" />
       </head>
       <body>
         {children}
