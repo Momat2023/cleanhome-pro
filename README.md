@@ -1,37 +1,141 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+---
 
-First, run the development server:
+## 🎯 Cas d'Usage
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### Pour les Familles
+- Répartissez équitablement les tâches entre membres
+- Motivez les enfants avec points et badges
+- Suivez qui fait quoi en temps réel
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Pour les Colocataires
+- Planning partagé transparent
+- Éliminez les conflits sur le ménage
+- Gamification pour rendre ça fun
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Pour les Particuliers
+- Ne plus oublier aucune tâche
+- Restez motivé avec les défis
+- Optimisez votre temps de ménage
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Pour les Professionnels
+- Template Maison pour AirBnB/conciergerie
+- Checklists complètes par zone
+- Export et partage facile
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 📸 Captures d'Écran
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 🏠 Tableau de bord
+![Dashboard](screenshots/dashboard.png)
+*Vue principale avec niveaux, stats et zones*
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 🎮 Gamification
+![Gamification](screenshots/gamification.png)
+*Badges, défis hebdomadaires et progression*
 
-## Deploy on Vercel
+### 👨‍👩‍👧‍👦 Famille
+![Family](screenshots/family.png)
+*Gestion familiale avec classement*
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# cleanhome-pro
+## 🤝 Contribuer
+
+Les contributions sont les bienvenues ! 🎉
+
+### Comment contribuer ?
+
+1. **Fork** le projet
+2. **Créez une branche** : `git checkout -b feature/amazing-feature`
+3. **Commit** : `git commit -m 'Add amazing feature'`
+4. **Push** : `git push origin feature/amazing-feature`
+5. **Pull Request** : Ouvrez une PR sur GitHub
+
+### Idées de contributions
+
+- 🌍 **Traductions** : Anglais, espagnol, allemand...
+- 🎨 **Thèmes** : Nouveaux color schemes
+- 🏆 **Badges** : Idées de nouveaux achievements
+- 🧹 **Tâches** : Ajout de nouvelles tâches par zone
+- 📱 **UI/UX** : Améliorations interface
+- 🐛 **Bugs** : Signalement et correction
+
+---
+
+## 🗺️ Roadmap 2026
+
+- [ ] **V2.0 - Sync Cloud** : Firebase/Supabase pour sync multi-devices
+- [ ] **V2.1 - IA Suggestions** : ChatGPT suggère tâches selon météo/saison
+- [ ] **V2.2 - Photos Avant/Après** : Upload images pour motivation
+- [ ] **V2.3 - Intégration Calendrier** : Google Calendar, Apple Calendar
+- [ ] **V2.4 - Marketplace Tutoriels** : Communauté partage astuces
+- [ ] **V2.5 - Mode Pro** : Fonctionnalités pour professionnels du nettoyage
+
+---
+
+## 📊 Statistiques du Projet
+
+- **250 tâches** organisées par 18 zones
+- **7 tutoriels vidéo** avec astuces
+- **10 badges** débloquables
+- **6 niveaux** de progression
+- **11 produits** avec prix moyens France
+- **5 templates** d'habitat prédéfinis
+- **100% fonctionnel** hors-ligne
+
+---
+
+## 🐛 Bugs Connus
+
+- [ ] Encodage UTF-8 parfois nécessaire si fichiers Windows (résolu avec `charset: 'UTF-8'`)
+- [x] Mode hors-ligne : Testé et validé ✅
+- [x] PWA installable : Fonctionne iOS/Android ✅
+
+---
+
+## 📄 Licence
+
+Ce projet est sous licence **MIT** - voir le fichier [LICENSE](LICENSE) pour plus de détails.
+
+---
+
+## 🙏 Remerciements
+
+- **Vercel** pour l'hébergement gratuit
+- **Next.js Team** pour le framework incroyable
+- **Communauté GitHub** pour les feedbacks
+
+---
+
+## ⭐ Vous aimez le projet ?
+
+Si **CleanHome Pro** vous aide au quotidien :
+- ⭐ **Star** le projet sur GitHub
+- 🐛 **Signaler** les bugs
+- 💡 **Partager** vos idées
+- 🚀 **Contribuer** au code
+
+---
+
+## 📞 Support
+
+Besoin d'aide ? Plusieurs options :
+
+- 📖 [Documentation complète](https://github.com/VOTRE-USERNAME/cleanhome-pro/wiki)
+- 💬 [Discussions GitHub](https://github.com/VOTRE-USERNAME/cleanhome-pro/discussions)
+- 🐛 [Signaler un bug](https://github.com/VOTRE-USERNAME/cleanhome-pro/issues)
+- 📧 Email : support@cleanhome-pro.com
+
+---
+
+<div align="center">
+
+**Fait avec ❤️ par la communauté CleanHome Pro**
+
+[⬆ Retour en haut](#-cleanhome-pro)
+
+</div>
+
+
