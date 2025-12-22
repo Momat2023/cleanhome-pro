@@ -1482,7 +1482,7 @@ export default function Home() {
                         background: '#4caf50',
                       }}
                     />
-                  )}
+)} 
                 </div>
               );
             })}
@@ -1511,21 +1511,23 @@ export default function Home() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {selectedDateTasks.map((task, idx) => {
                     const isCompleted = history.some((h) => h.taskId === task.taskId && h.date === selectedDate);
+                    const assignment = taskAssignments.find((a) => a.taskId === task.taskId);
+                    const assignedMember = assignment ? familyMembers.find((m) => m.id === assignment.memberId) : null;
+                    
                     return (
                       <div
                         key={idx}
-                        onClick={() => toggleTaskCompletionForDate(task.taskId, selectedDate)}
                         style={{
                           padding: '1rem',
                           background: isCompleted ? (darkMode ? '#1e3a1e' : '#e8f5e9') : theme.cardBg,
-                          border: isCompleted ? '2px solid #4caf50' : `1px solid ${theme.border}`,
+                          border: isCompleted ? '2px solid #4caf50' : assignedMember ? `2px solid ${assignedMember.color}` : `1px solid ${theme.border}`,
                           borderRadius: '8px',
-                          cursor: 'pointer',
                           transition: 'all 0.3s ease',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'start', gap: '0.75rem' }}>
                           <div
+                            onClick={() => toggleTaskCompletionForDate(task.taskId, selectedDate)}
                             style={{
                               width: '24px',
                               height: '24px',
@@ -1536,6 +1538,8 @@ export default function Home() {
                               alignItems: 'center',
                               justifyContent: 'center',
                               flexShrink: 0,
+                              cursor: 'pointer',
+                              marginTop: '2px',
                             }}
                           >
                             {isCompleted && (
@@ -1598,6 +1602,41 @@ export default function Home() {
                                 </span>
                               )}
                             </div>
+
+                            {/* 🆕 ATTRIBUTION DES MEMBRES DANS CALENDRIER */}
+                            {familyMembers.length > 0 && (
+                              <div style={{ marginTop: '0.75rem' }}>
+                                <select
+                                  value={assignedMember?.id || ''}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    if (e.target.value) {
+                                      assignTaskToMember(task.taskId, e.target.value);
+                                    }
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    padding: '0.4rem 0.75rem',
+                                    borderRadius: '6px',
+                                    border: `2px solid ${assignedMember ? assignedMember.color : theme.border}`,
+                                    background: assignedMember ? assignedMember.color : theme.bg,
+                                    color: assignedMember ? 'white' : theme.text,
+                                    fontSize: '0.85rem',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    width: '100%',
+                                    maxWidth: '200px',
+                                  }}
+                                >
+                                  <option value="" style={{ background: theme.cardBg, color: theme.text }}>👤 Assigner à...</option>
+                                  {familyMembers.map((member) => (
+                                    <option key={member.id} value={member.id} style={{ background: theme.cardBg, color: theme.text }}>
+                                      {member.avatar} {member.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1611,6 +1650,7 @@ export default function Home() {
       )}
 
       {/* STATISTIQUES */}
+
       {showStats && (
         <div
           style={{
