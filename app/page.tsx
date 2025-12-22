@@ -939,8 +939,8 @@ export default function Home() {
 
                 let progress = 0;
                 if (challenge.id.includes('complete-10')) {
-                  // 1,2,3,... pas de clamp
-                  progress = thisWeekTasks.length;
+                  // Limiter à 10 maximum
+                  progress = Math.min(thisWeekTasks.length, challenge.target);
                 } else if (challenge.id.includes('points')) {
                   const weekPoints = thisWeekTasks.reduce((sum, t) => sum + (t.points || 0), 0);
                   progress = weekPoints;
