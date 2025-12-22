@@ -84,13 +84,12 @@ export default function Home() {
   const [weeklyChallenges, setWeeklyChallenges] = useState<Challenge[]>([]);
   const [newBadgeUnlocked, setNewBadgeUnlocked] = useState<Badge | null>(null);
 
-  // NOUVELLES FONCTIONNALITÉS AVANCÉES
+  // FONCTIONNALITÉS AVANCÉES
   const [searchQuery, setSearchQuery] = useState('');
   const [favoriteTasks, setFavoriteTasks] = useState<Set<number>>(new Set());
   const [customTasks, setCustomTasks] = useState<any[]>([]);
   const [hiddenTasks, setHiddenTasks] = useState<Set<number>>(new Set());
   const [showAddTask, setShowAddTask] = useState(false);
-  const [showEditTask, setShowEditTask] = useState<number | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('all');
   const [newTask, setNewTask] = useState({
     name: '',
@@ -286,58 +285,46 @@ export default function Home() {
     }
   }, [unlockedBadges]);
 
-  const getLast7Days = () => {
-
-  // Charger les favoris
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('favorite-tasks');
-      if (saved) {
-        setFavoriteTasks(new Set(JSON.parse(saved)));
-      }
+      if (saved) setFavoriteTasks(new Set(JSON.parse(saved)));
     }
   }, []);
 
-  // Sauvegarder les favoris
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('favorite-tasks', JSON.stringify([...favoriteTasks]));
     }
   }, [favoriteTasks]);
 
-  // Charger les tâches personnalisées
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('custom-tasks');
-      if (saved) {
-        setCustomTasks(JSON.parse(saved));
-      }
+      if (saved) setCustomTasks(JSON.parse(saved));
     }
   }, []);
 
-  // Sauvegarder les tâches personnalisées
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('custom-tasks', JSON.stringify(customTasks));
     }
   }, [customTasks]);
 
-  // Charger les tâches cachées
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('hidden-tasks');
-      if (saved) {
-        setHiddenTasks(new Set(JSON.parse(saved)));
-      }
+      if (saved) setHiddenTasks(new Set(JSON.parse(saved)));
     }
   }, []);
 
-  // Sauvegarder les tâches cachées
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('hidden-tasks', JSON.stringify([...hiddenTasks]));
     }
   }, [hiddenTasks]);
+
+  const getLast7Days = () => {
     const days = [];
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
@@ -446,36 +433,29 @@ export default function Home() {
       createdAt: new Date().toISOString(),
     };
 
-  // Toggle favori
+    setTaskComments([...taskComments, comment]);
+    setNewComment('');
+    setSelectedTaskForComment(null);
+  };
+
   const toggleFavorite = (taskId: number) => {
     setFavoriteTasks((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(taskId)) {
-        newSet.delete(taskId);
-      } else {
-        newSet.add(taskId);
-      }
+      newSet.has(taskId) ? newSet.delete(taskId) : newSet.add(taskId);
       return newSet;
     });
   };
 
-  // Toggle masquer tâche
   const toggleHideTask = (taskId: number) => {
     setHiddenTasks((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(taskId)) {
-        newSet.delete(taskId);
-      } else {
-        newSet.add(taskId);
-      }
+      newSet.has(taskId) ? newSet.delete(taskId) : newSet.add(taskId);
       return newSet;
     });
   };
 
-  // Ajouter une tâche personnalisée
   const addCustomTask = () => {
     if (!newTask.name.trim()) return;
-
     const task = {
       id: Date.now(),
       name: newTask.name,
@@ -485,67 +465,22 @@ export default function Home() {
       description: newTask.description,
       isCustom: true
     };
-
     setCustomTasks([...customTasks, task]);
-    setNewTask({
-      name: '',
-      zone: 'Cuisine',
-      frequency: 'quotidienne',
-      estimatedTime: 10,
-      description: ''
-    });
+    setNewTask({ name: '', zone: 'Cuisine', frequency: 'quotidienne', estimatedTime: 10, description: '' });
     setShowAddTask(false);
   };
 
-  // Supprimer une tâche personnalisée
   const deleteCustomTask = (taskId: number) => {
     setCustomTasks(customTasks.filter(t => t.id !== taskId));
-    setCompletedTasks(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(taskId);
-      return newSet;
-    });
+    setCompletedTasks(prev => { const newSet = new Set(prev); newSet.delete(taskId); return newSet; });
   };
 
-  // Modifier une tâche
-  const updateCustomTask = (taskId: number) => {
-    setCustomTasks(customTasks.map(t => 
-      t.id === taskId ? { ...t, ...newTask } : t
-    ));
-    setShowEditTask(null);
-    setNewTask({
-      name: '',
-      zone: 'Cuisine',
-      frequency: 'quotidienne',
-      estimatedTime: 10,
-      description: ''
-    });
-  };
-
-  // Templates par habitat
   const TEMPLATES = {
-    all: { name: 'Toutes les tâches', zones: [] as string[] },
-    studio: { 
-      name: 'Studio', 
-      zones: ['Cuisine', 'Salon', 'Salle de bain']
-    },
-    appartement: { 
-      name: 'Appartement', 
-      zones: ['Cuisine', 'Salon', 'Chambre', 'Salle de bain', 'Entrée']
-    },
-    maison: { 
-      name: 'Maison', 
-      zones: ['Cuisine', 'Salon', 'Chambre', 'Salle de bain', 'Entrée', 'Garage', 'Jardin', 'Buanderie']
-    },
-    minimal: {
-      name: 'Minimaliste',
-      zones: ['Cuisine', 'Salle de bain']
-    }
-  };
-
-    setTaskComments([...taskComments, comment]);
-    setNewComment('');
-    setSelectedTaskForComment(null);
+    all: { name: 'Toutes', zones: [] as string[] },
+    studio: { name: 'Studio', zones: ['Cuisine', 'Salon', 'Salle de bain'] },
+    appartement: { name: 'Appartement', zones: ['Cuisine', 'Salon', 'Chambre', 'Salle de bain', 'Entrée'] },
+    maison: { name: 'Maison', zones: ['Cuisine', 'Salon', 'Chambre', 'Salle de bain', 'Entrée', 'Garage', 'Jardin', 'Buanderie'] },
+    minimal: { name: 'Minimaliste', zones: ['Cuisine', 'Salle de bain'] }
   };
 
   const handleEnableNotifications = async () => {
@@ -672,13 +607,9 @@ export default function Home() {
   const today = new Date().toISOString().split('T')[0];
   const selectedDateTasks = selectedDate ? getTasksForDate(selectedDate, scheduledTasks) : [];
 
-  // Fusionner les tâches par défaut et personnalisées
   const allTasks = [...TASKS, ...customTasks];
-
-  // Filtrer par zone sélectionnée
   let zoneTasks = selectedZone ? allTasks.filter((t) => t.zone === selectedZone) : [];
 
-  // Filtrer par template
   if (selectedTemplate !== 'all') {
     const templateZones = TEMPLATES[selectedTemplate as keyof typeof TEMPLATES].zones;
     if (templateZones.length > 0) {
@@ -686,24 +617,19 @@ export default function Home() {
     }
   }
 
-  // Filtrer par fréquence
   if (filterFrequency !== 'all') {
     zoneTasks = zoneTasks.filter((t) => t.frequency === filterFrequency);
   }
 
-  // Filtrer par recherche
   if (searchQuery.trim()) {
     zoneTasks = zoneTasks.filter(t => 
       t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.zone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      t.zone.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }
 
-  // Exclure les tâches masquées
   zoneTasks = zoneTasks.filter(t => !hiddenTasks.has(t.id));
 
-  // Trier : favoris en premier
   zoneTasks.sort((a, b) => {
     const aFav = favoriteTasks.has(a.id) ? 1 : 0;
     const bFav = favoriteTasks.has(b.id) ? 1 : 0;
@@ -1136,7 +1062,6 @@ export default function Home() {
 
                 let progress = 0;
                 if (challenge.id.includes('complete-10')) {
-                  // Limiter à 10 maximum
                   progress = Math.min(thisWeekTasks.length, challenge.target);
                 } else if (challenge.id.includes('points')) {
                   const weekPoints = thisWeekTasks.reduce((sum, t) => sum + (t.points || 0), 0);
@@ -1695,79 +1620,6 @@ export default function Home() {
                 </div>
               )}
             </div>
-
-            {/* Boutons d'action sur chaque tâche */}
-            <div style={{ 
-              marginTop: '0.75rem', 
-              display: 'flex', 
-              gap: '0.5rem', 
-              justifyContent: 'flex-end',
-              borderTop: `1px solid ${theme.border}`,
-              paddingTop: '0.75rem'
-            }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleFavorite(task.id);
-                }}
-                style={{
-                  padding: '0.4rem 0.6rem',
-                  background: favoriteTasks.has(task.id) ? '#fbbf24' : theme.bg,
-                  color: favoriteTasks.has(task.id) ? 'white' : theme.text,
-                  border: `2px solid ${theme.border}`,
-                  borderRadius: '6px',
-                  fontSize: '1.2rem',
-                  cursor: 'pointer',
-                }}
-                title={favoriteTasks.has(task.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-              >
-                {favoriteTasks.has(task.id) ? '⭐' : '☆'}
-              </button>
-
-              {task.isCustom && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm('Supprimer cette tâche ?')) {
-                      deleteCustomTask(task.id);
-                    }
-                  }}
-                  style={{
-                    padding: '0.4rem 0.6rem',
-                    background: '#ef4444',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                  }}
-                  title="Supprimer"
-                >
-                  🗑️
-                </button>
-              )}
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (confirm('Masquer cette tâche ? Vous pourrez la restaurer plus tard.')) {
-                    toggleHideTask(task.id);
-                  }
-                }}
-                style={{
-                  padding: '0.4rem 0.6rem',
-                  background: theme.bg,
-                  color: theme.textSecondary,
-                  border: `2px solid ${theme.border}`,
-                  borderRadius: '6px',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                }}
-                title="Masquer"
-              >
-                👁️‍🗨️
-              </button>
-            </div>
           )}
         </div>
       )}
@@ -1886,199 +1738,50 @@ export default function Home() {
         </div>
       )}
 
-            {/* BARRE DE RECHERCHE ET TEMPLATES */}
-      <div
-        style={{
-          background: theme.cardBg,
-          borderRadius: '16px',
-          padding: '1.5rem',
-          marginBottom: '1rem',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-          border: `1px solid ${theme.border}`,
-        }}
-      >
-        {/* Barre de recherche */}
-        <div style={{ marginBottom: '1rem' }}>
-          <input
-            type="text"
-            placeholder="🔍 Rechercher une tâche..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              border: `2px solid ${theme.border}`,
-              background: theme.bg,
-              color: theme.text,
-              fontSize: '1rem',
-            }}
-          />
-        </div>
+      {/* RECHERCHE ET TEMPLATES */}
+      <div style={{ background: theme.cardBg, borderRadius: '16px', padding: '1.5rem', marginBottom: '1rem', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', border: `1px solid ${theme.border}` }}>
+        <input
+          type="text"
+          placeholder="🔍 Rechercher une tâche..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: `2px solid ${theme.border}`, background: theme.bg, color: theme.text, fontSize: '1rem', marginBottom: '1rem' }}
+        />
 
-        {/* Templates habitat */}
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-          <span style={{ fontSize: '0.85rem', color: theme.textSecondary, alignSelf: 'center' }}>
-            Type d'habitat :
-          </span>
+          <span style={{ fontSize: '0.85rem', color: theme.textSecondary, alignSelf: 'center' }}>Type :</span>
           {Object.entries(TEMPLATES).map(([key, template]) => (
-            <button
-              key={key}
-              onClick={() => setSelectedTemplate(key)}
-              style={{
-                padding: '0.4rem 0.8rem',
-                background: selectedTemplate === key ? '#3b82f6' : theme.bg,
-                color: selectedTemplate === key ? 'white' : theme.text,
-                border: `2px solid ${theme.border}`,
-                borderRadius: '6px',
-                fontSize: '0.8rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
-            >
+            <button key={key} onClick={() => setSelectedTemplate(key)} style={{ padding: '0.4rem 0.8rem', background: selectedTemplate === key ? '#3b82f6' : theme.bg, color: selectedTemplate === key ? 'white' : theme.text, border: `2px solid ${theme.border}`, borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' }}>
               {template.name}
             </button>
           ))}
         </div>
 
-        {/* Bouton ajouter tâche */}
         {!showAddTask ? (
-          <button
-            onClick={() => setShowAddTask(true)}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              background: 'linear-gradient(135deg, #10b981, #059669)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.9rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
+          <button onClick={() => setShowAddTask(true)} style={{ width: '100%', padding: '0.75rem', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer' }}>
             ➕ Ajouter une tâche personnalisée
           </button>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem', background: theme.bg, borderRadius: '8px' }}>
-            <input
-              type="text"
-              placeholder="Nom de la tâche"
-              value={newTask.name}
-              onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
-              style={{
-                padding: '0.5rem',
-                borderRadius: '6px',
-                border: `2px solid ${theme.border}`,
-                background: theme.cardBg,
-                color: theme.text,
-              }}
-            />
+            <input type="text" placeholder="Nom de la tâche" value={newTask.name} onChange={(e) => setNewTask({ ...newTask, name: e.target.value })} style={{ padding: '0.5rem', borderRadius: '6px', border: `2px solid ${theme.border}`, background: theme.cardBg, color: theme.text }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-              <select
-                value={newTask.zone}
-                onChange={(e) => setNewTask({ ...newTask, zone: e.target.value })}
-                style={{
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  border: `2px solid ${theme.border}`,
-                  background: theme.cardBg,
-                  color: theme.text,
-                }}
-              >
-                {ZONES.map(zone => (
-                  <option key={zone} value={zone}>{zone}</option>
-                ))}
+              <select value={newTask.zone} onChange={(e) => setNewTask({ ...newTask, zone: e.target.value })} style={{ padding: '0.5rem', borderRadius: '6px', border: `2px solid ${theme.border}`, background: theme.cardBg, color: theme.text }}>
+                {ZONES.map(zone => <option key={zone} value={zone}>{zone}</option>)}
               </select>
-              <select
-                value={newTask.frequency}
-                onChange={(e) => setNewTask({ ...newTask, frequency: e.target.value })}
-                style={{
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  border: `2px solid ${theme.border}`,
-                  background: theme.cardBg,
-                  color: theme.text,
-                }}
-              >
-                {frequencies.map(freq => (
-                  <option key={freq} value={freq}>{freq}</option>
-                ))}
+              <select value={newTask.frequency} onChange={(e) => setNewTask({ ...newTask, frequency: e.target.value })} style={{ padding: '0.5rem', borderRadius: '6px', border: `2px solid ${theme.border}`, background: theme.cardBg, color: theme.text }}>
+                {frequencies.map(freq => <option key={freq} value={freq}>{freq}</option>)}
               </select>
             </div>
-            <input
-              type="number"
-              placeholder="Durée (min)"
-              value={newTask.estimatedTime}
-              onChange={(e) => setNewTask({ ...newTask, estimatedTime: parseInt(e.target.value) || 10 })}
-              style={{
-                padding: '0.5rem',
-                borderRadius: '6px',
-                border: `2px solid ${theme.border}`,
-                background: theme.cardBg,
-                color: theme.text,
-              }}
-            />
-            <textarea
-              placeholder="Description (optionnel)"
-              value={newTask.description}
-              onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-              style={{
-                padding: '0.5rem',
-                borderRadius: '6px',
-                border: `2px solid ${theme.border}`,
-                background: theme.cardBg,
-                color: theme.text,
-                minHeight: '60px',
-                resize: 'vertical',
-              }}
-            />
+            <input type="number" placeholder="Durée (min)" value={newTask.estimatedTime} onChange={(e) => setNewTask({ ...newTask, estimatedTime: parseInt(e.target.value) || 10 })} style={{ padding: '0.5rem', borderRadius: '6px', border: `2px solid ${theme.border}`, background: theme.cardBg, color: theme.text }} />
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={addCustomTask}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem',
-                  background: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                ✅ Ajouter
-              </button>
-              <button
-                onClick={() => {
-                  setShowAddTask(false);
-                  setNewTask({
-                    name: '',
-                    zone: 'Cuisine',
-                    frequency: 'quotidienne',
-                    estimatedTime: 10,
-                    description: ''
-                  });
-                }}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem',
-                  background: '#ef4444',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                ❌ Annuler
-              </button>
+              <button onClick={addCustomTask} style={{ flex: 1, padding: '0.5rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>✅ Ajouter</button>
+              <button onClick={() => { setShowAddTask(false); setNewTask({ name: '', zone: 'Cuisine', frequency: 'quotidienne', estimatedTime: 10, description: '' }); }} style={{ flex: 1, padding: '0.5rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>❌ Annuler</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* ZONES ET TÂCHES */}
+            {/* ZONES ET TÂCHES */}
       {!selectedZone ? (
         <>
           <div
