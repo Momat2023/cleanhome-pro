@@ -84,7 +84,6 @@ export default function Home() {
   const [weeklyChallenges, setWeeklyChallenges] = useState<Challenge[]>([]);
   const [newBadgeUnlocked, setNewBadgeUnlocked] = useState<Badge | null>(null);
 
-  // FONCTIONNALITÉS AVANCÉES
   const [searchQuery, setSearchQuery] = useState('');
   const [favoriteTasks, setFavoriteTasks] = useState<Set<number>>(new Set());
   const [customTasks, setCustomTasks] = useState<any[]>([]);
@@ -289,6 +288,10 @@ export default function Home() {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('favorite-tasks');
       if (saved) setFavoriteTasks(new Set(JSON.parse(saved)));
+      const savedCustom = localStorage.getItem('custom-tasks');
+      if (savedCustom) setCustomTasks(JSON.parse(savedCustom));
+      const savedHidden = localStorage.getItem('hidden-tasks');
+      if (savedHidden) setHiddenTasks(new Set(JSON.parse(savedHidden)));
     }
   }, []);
 
@@ -300,23 +303,9 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('custom-tasks');
-      if (saved) setCustomTasks(JSON.parse(saved));
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
       localStorage.setItem('custom-tasks', JSON.stringify(customTasks));
     }
   }, [customTasks]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('hidden-tasks');
-      if (saved) setHiddenTasks(new Set(JSON.parse(saved)));
-    }
-  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -472,14 +461,34 @@ export default function Home() {
 
   const deleteCustomTask = (taskId: number) => {
     setCustomTasks(customTasks.filter(t => t.id !== taskId));
-    setCompletedTasks(prev => { const newSet = new Set(prev); newSet.delete(taskId); return newSet; });
+    setCompletedTasks(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(taskId);
+      return newSet;
+    });
+    // Supprimer aussi de l'historique
+    setHistory(prev => prev.filter(h => h.taskId !== taskId));
+  };
+
+  const deleteDefaultTask = (taskId: number) => {
+    // Pour les tâches par défaut, on les masque définitivement
+    setHiddenTasks(prev => {
+      const newSet = new Set(prev);
+      newSet.add(taskId);
+      return newSet;
+    });
+    setCompletedTasks(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(taskId);
+      return newSet;
+    });
   };
 
   const TEMPLATES = {
     all: { name: 'Toutes', zones: [] as string[] },
     studio: { name: 'Studio', zones: ['Cuisine', 'Salon', 'Salle de bain'] },
-    appartement: { name: 'Appartement', zones: ['Cuisine', 'Salon', 'Chambre', 'Salle de bain', 'Entrée'] },
-    maison: { name: 'Maison', zones: ['Cuisine', 'Salon', 'Chambre', 'Salle de bain', 'Entrée', 'Garage', 'Jardin', 'Buanderie'] },
+    appartement: { name: 'Appartement', zones: ['Cuisine', 'Salon', 'Chambres', 'Salle de bain', 'Entrée'] },
+    maison: { name: 'Maison', zones: ['Cuisine', 'Salon', 'Chambres', 'Salle de bain', 'Entrée', 'Garage', 'Extérieur', 'Buanderie'] },
     minimal: { name: 'Minimaliste', zones: ['Cuisine', 'Salle de bain'] }
   };
 
@@ -608,13 +617,19 @@ export default function Home() {
   const selectedDateTasks = selectedDate ? getTasksForDate(selectedDate, scheduledTasks) : [];
 
   const allTasks = [...TASKS, ...customTasks];
-  let zoneTasks = selectedZone ? allTasks.filter((t) => t.zone === selectedZone) : [];
 
+  // Filtrer d'abord par template (si sélectionné)
+  let zoneTasks = allTasks;
   if (selectedTemplate !== 'all') {
     const templateZones = TEMPLATES[selectedTemplate as keyof typeof TEMPLATES].zones;
     if (templateZones.length > 0) {
       zoneTasks = zoneTasks.filter(t => templateZones.includes(t.zone));
     }
+  }
+
+  // Puis filtrer par zone sélectionnée (si applicable)
+  if (selectedZone) {
+    zoneTasks = zoneTasks.filter((t) => t.zone === selectedZone);
   }
 
   if (filterFrequency !== 'all') {
@@ -1748,13 +1763,34 @@ export default function Home() {
           style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: `2px solid ${theme.border}`, background: theme.bg, color: theme.text, fontSize: '1rem', marginBottom: '1rem' }}
         />
 
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-          <span style={{ fontSize: '0.85rem', color: theme.textSecondary, alignSelf: 'center' }}>Type :</span>
-          {Object.entries(TEMPLATES).map(([key, template]) => (
-            <button key={key} onClick={() => setSelectedTemplate(key)} style={{ padding: '0.4rem 0.8rem', background: selectedTemplate === key ? '#3b82f6' : theme.bg, color: selectedTemplate === key ? 'white' : theme.text, border: `2px solid ${theme.border}`, borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' }}>
-              {template.name}
-            </button>
-          ))}
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '0.85rem', color: theme.textSecondary, marginBottom: '0.5rem' }}>
+            Type d'habitat (filtre automatique) :
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {Object.entries(TEMPLATES).map(([key, template]) => (
+              <button
+                key={key}
+                onClick={() => {
+                  setSelectedTemplate(key);
+                  setSelectedZone(null);
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: selectedTemplate === key ? '#3b82f6' : theme.bg,
+                  color: selectedTemplate === key ? 'white' : theme.text,
+                  border: `2px solid ${selectedTemplate === key ? '#3b82f6' : theme.border}`,
+                  borderRadius: '8px',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {template.name}
+              </button>
+            ))}
+          </div>
         </div>
 
         {!showAddTask ? (
@@ -1777,6 +1813,20 @@ export default function Home() {
               <button onClick={addCustomTask} style={{ flex: 1, padding: '0.5rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>✅ Ajouter</button>
               <button onClick={() => { setShowAddTask(false); setNewTask({ name: '', zone: 'Cuisine', frequency: 'quotidienne', estimatedTime: 10, description: '' }); }} style={{ flex: 1, padding: '0.5rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>❌ Annuler</button>
             </div>
+          </div>
+        )}
+
+        {hiddenTasks.size > 0 && (
+          <div style={{ marginTop: '1rem', padding: '0.75rem', background: theme.bg, borderRadius: '8px', border: `1px solid ${theme.border}` }}>
+            <div style={{ fontSize: '0.85rem', color: theme.textSecondary, marginBottom: '0.5rem' }}>
+              {hiddenTasks.size} tâche(s) masquée(s)
+            </div>
+            <button
+              onClick={() => setHiddenTasks(new Set())}
+              style={{ padding: '0.4rem 0.8rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' }}
+            >
+              ↩️ Tout restaurer
+            </button>
           </div>
         )}
       </div>
