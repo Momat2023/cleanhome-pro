@@ -279,10 +279,10 @@ export default function Home() {
     return streak;
   })();
 
-  const checkForNewBadges = () => {
+  const checkForNewBadges = (currentPoints: number) => {
     const stats = {
       totalTasks: history.length,
-      totalPoints,
+      totalPoints: currentPoints,
       currentStreak: streakDays
     };
 
@@ -872,7 +872,7 @@ export default function Home() {
                 
                 let progress = 0;
                 if (challenge.id.includes('complete-10')) {
-                  progress = Math.min(thisWeekTasks.length, challenge.target);
+                  progress = thisWeekTasks.length;
                 } else if (challenge.id.includes('points')) {
                   const weekPoints = thisWeekTasks.reduce((sum, t) => sum + (t.points || 0), 0);
                   progress = Math.min(weekPoints, challenge.target);
