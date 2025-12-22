@@ -3,12 +3,17 @@
 import { useEffect, useState } from 'react';
 import { TASKS, ZONES } from '../lib/tasksData';
 import { getScheduledTasksForMonth, getTasksForDate, ScheduledTask } from '../lib/calendarUtils';
+import type { FamilyMember, TaskAssignment, TaskComment } from '../types';
 
 interface CompletedTask {
   taskId: number;
   completedAt: string;
   date: string;
+  memberId?: string;
 }
+
+const DEFAULT_AVATARS = ['👨', '👩', '👦', '👧', '👴', '👵', '🧑', '👶'];
+const DEFAULT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 function requestNotificationPermission() {
   return new Promise<boolean>((resolve) => {
@@ -38,6 +43,7 @@ export default function Home() {
   const [darkMode, setDarkMode] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showFamily, setShowFamily] = useState(false);
   const [history, setHistory] = useState<CompletedTask[]>([]);
   const [isOnline, setIsOnline] = useState(true);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
@@ -48,25 +54,26 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
 
+  // Partage familial
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [taskAssignments, setTaskAssignments] = useState<TaskAssignment[]>([]);
+  const [taskComments, setTaskComments] = useState<TaskComment[]>([]);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [selectedTaskForComment, setSelectedTaskForComment] = useState<number | null>(null);
+  const [newComment, setNewComment] = useState('');
+  const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // État de connexion
       setIsOnline(navigator.onLine);
       
-      const handleOnline = () => {
-        setIsOnline(true);
-        console.log('✅ Connexion rétablie');
-      };
-      
-      const handleOffline = () => {
-        setIsOnline(false);
-        console.log('📡 Mode hors-ligne activé');
-      };
+      const handleOnline = () => setIsOnline(true);
+      const handleOffline = () => setIsOnline(false);
       
       window.addEventListener('online', handleOnline);
       window.addEventListener('offline', handleOffline);
 
-      // Prompt d'installation PWA
       const handleBeforeInstallPrompt = (e: any) => {
         e.preventDefault();
         setDeferredPrompt(e);
@@ -92,11 +99,31 @@ export default function Home() {
         setDarkMode(true);
       }
 
+      // Charger données familiales
+      const savedMembers = localStorage.getItem('family-members');
+      if (savedMembers) {
+        setFamilyMembers(JSON.parse(savedMembers));
+      }
+
+      const savedAssignments = localStorage.getItem('task-assignments');
+      if (savedAssignments) {
+        setTaskAssignments(JSON.parse(savedAssignments));
+      }
+
+      const savedComments = localStorage.getItem('task-comments');
+      if (savedComments) {
+        setTaskComments(JSON.parse(savedComments));
+      }
+
+      const savedCurrentMember = localStorage.getItem('current-member-id');
+      if (savedCurrentMember) {
+        setCurrentMemberId(savedCurrentMember);
+      }
+
       if ('Notification' in window && Notification.permission === 'granted') {
         setNotificationEnabled(true);
       }
 
-      // Enregistrer Service Worker
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')
           .then(reg => console.log('✅ Service Worker enregistré'))
@@ -113,14 +140,11 @@ export default function Home() {
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
-    
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    
     if (outcome === 'accepted') {
       console.log('✅ PWA installée');
     }
-    
     setDeferredPrompt(null);
     setShowInstallPrompt(false);
   };
@@ -140,6 +164,9 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('tasks-history', JSON.stringify(history));
+      
+      // Mettre à jour les points
+      updateMemberPoints();
     }
   }, [history]);
 
@@ -148,6 +175,102 @@ export default function Home() {
       localStorage.setItem('darkMode', darkMode.toString());
     }
   }, [darkMode]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('family-members', JSON.stringify(familyMembers));
+    }
+  }, [familyMembers]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('task-assignments', JSON.stringify(taskAssignments));
+    }
+  }, [taskAssignments]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('task-comments', JSON.stringify(taskComments));
+    }
+  }, [taskComments]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && currentMemberId) {
+      localStorage.setItem('current-member-id', currentMemberId);
+    }
+  }, [currentMemberId]);
+
+  const updateMemberPoints = () => {
+    setFamilyMembers(prev => {
+      return prev.map(member => {
+        const memberTasks = history.filter(h => h.memberId === member.id);
+        const points = memberTasks.reduce((sum, task) => {
+          const taskData = TASKS.find(t => t.id === task.taskId);
+          return sum + (taskData?.estimatedTime || 10);
+        }, 0);
+        return { ...member, points };
+      });
+    });
+  };
+
+  const addFamilyMember = () => {
+    if (!newMemberName.trim()) return;
+    
+    const newMember: FamilyMember = {
+      id: Date.now().toString(),
+      name: newMemberName.trim(),
+      color: DEFAULT_COLORS[familyMembers.length % DEFAULT_COLORS.length],
+      avatar: DEFAULT_AVATARS[familyMembers.length % DEFAULT_AVATARS.length],
+      points: 0
+    };
+    
+    setFamilyMembers([...familyMembers, newMember]);
+    setNewMemberName('');
+    setShowAddMember(false);
+    
+    if (!currentMemberId) {
+      setCurrentMemberId(newMember.id);
+    }
+  };
+
+  const removeFamilyMember = (memberId: string) => {
+    setFamilyMembers(familyMembers.filter(m => m.id !== memberId));
+    setTaskAssignments(taskAssignments.filter(a => a.memberId !== memberId));
+    if (currentMemberId === memberId) {
+      setCurrentMemberId(familyMembers[0]?.id || null);
+    }
+  };
+
+  const assignTaskToMember = (taskId: number, memberId: string) => {
+    const existing = taskAssignments.find(a => a.taskId === taskId);
+    if (existing) {
+      setTaskAssignments(taskAssignments.map(a => 
+        a.taskId === taskId ? { ...a, memberId, assignedAt: new Date().toISOString() } : a
+      ));
+    } else {
+      setTaskAssignments([...taskAssignments, {
+        taskId,
+        memberId,
+        assignedAt: new Date().toISOString()
+      }]);
+    }
+  };
+
+  const addComment = (taskId: number) => {
+    if (!newComment.trim() || !currentMemberId) return;
+    
+    const comment: TaskComment = {
+      id: Date.now().toString(),
+      taskId,
+      memberId: currentMemberId,
+      comment: newComment.trim(),
+      createdAt: new Date().toISOString()
+    };
+    
+    setTaskComments([...taskComments, comment]);
+    setNewComment('');
+    setSelectedTaskForComment(null);
+  };
 
   const handleEnableNotifications = async () => {
     const granted = await requestNotificationPermission();
@@ -165,7 +288,7 @@ export default function Home() {
         setHistory(h => h.filter(item => !(item.taskId === taskId && item.date === today)));
       } else {
         newSet.add(taskId);
-        setHistory(h => [...h, { taskId, completedAt: now, date: today }]);
+        setHistory(h => [...h, { taskId, completedAt: now, date: today, memberId: currentMemberId || undefined }]);
       }
       return newSet;
     });
@@ -179,7 +302,7 @@ export default function Home() {
       if (existing) {
         return prev.filter(item => !(item.taskId === taskId && item.date === date));
       } else {
-        return [...prev, { taskId, completedAt: now, date }];
+        return [...prev, { taskId, completedAt: now, date, memberId: currentMemberId || undefined }];
       }
     });
 
@@ -277,6 +400,8 @@ export default function Home() {
     gradientTo: darkMode ? '#3730a3' : '#bbdefb',
   };
 
+  const sortedMembers = [...familyMembers].sort((a, b) => b.points - a.points);
+
   return (
     <main style={{ 
       padding: '1rem', 
@@ -286,7 +411,6 @@ export default function Home() {
       background: theme.bg,
       transition: 'background 0.3s ease'
     }}>
-      {/* BANNIÈRE HORS-LIGNE */}
       {!isOnline && (
         <div style={{
           position: 'fixed',
@@ -306,7 +430,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* PROMPT INSTALLATION PWA */}
       {showInstallPrompt && (
         <div style={{
           position: 'fixed',
@@ -405,8 +528,28 @@ export default function Home() {
         }}>
           <button
             onClick={() => {
+              setShowFamily(!showFamily);
+              setShowCalendar(false);
+              setShowStats(false);
+            }}
+            style={{
+              padding: '0.5rem 1rem',
+              background: showFamily ? '#3b82f6' : theme.cardBg,
+              color: showFamily ? 'white' : theme.text,
+              border: `2px solid ${theme.border}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '1.3rem'
+            }}
+            title="Famille"
+          >
+            👨‍👩‍👧‍👦
+          </button>
+          <button
+            onClick={() => {
               setShowCalendar(!showCalendar);
               setShowStats(false);
+              setShowFamily(false);
             }}
             style={{
               padding: '0.5rem 1rem',
@@ -425,6 +568,7 @@ export default function Home() {
             onClick={() => {
               setShowStats(!showStats);
               setShowCalendar(false);
+              setShowFamily(false);
             }}
             style={{
               padding: '0.5rem 1rem',
@@ -470,6 +614,39 @@ export default function Home() {
           </button>
         </div>
 
+        {currentMemberId && familyMembers.length > 0 && (
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            gap: '0.5rem',
+            marginBottom: '1rem',
+            flexWrap: 'wrap'
+          }}>
+            {familyMembers.map(member => (
+              <button
+                key={member.id}
+                onClick={() => setCurrentMemberId(member.id)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: currentMemberId === member.id ? member.color : theme.cardBg,
+                  color: currentMemberId === member.id ? 'white' : theme.text,
+                  border: `2px solid ${currentMemberId === member.id ? member.color : theme.border}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>{member.avatar}</span>
+                {member.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         <p style={{ fontSize: '1rem', color: theme.textSecondary, marginBottom: '0.75rem', textAlign: 'center' }}>
           <strong>{TASKS.length} tâches</strong> organisées
         </p>
@@ -488,7 +665,156 @@ export default function Home() {
         </div>
       </header>
 
-      {/* CALENDRIER */}
+      {/* GESTION FAMILIALE */}
+      {showFamily && (
+        <div style={{ 
+          background: theme.cardBg, 
+          borderRadius: '16px', 
+          padding: '1.5rem', 
+          marginBottom: '1rem',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+          border: `1px solid ${theme.border}`
+        }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: theme.text, marginBottom: '1rem' }}>
+            👨‍👩‍👧‍👦 Gestion Familiale
+          </h2>
+
+          {/* Classement */}
+          {sortedMembers.length > 0 && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: '600', color: theme.text, marginBottom: '1rem' }}>
+                🏆 Classement
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {sortedMembers.map((member, index) => (
+                  <div 
+                    key={member.id}
+                    style={{
+                      padding: '1rem',
+                      background: index === 0 ? 'linear-gradient(135deg, #fbbf24, #f59e0b)' : theme.bg,
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      border: `2px solid ${index === 0 ? '#f59e0b' : theme.border}`
+                    }}
+                  >
+                    <div style={{ 
+                      fontSize: '2rem', 
+                      fontWeight: 'bold',
+                      color: index === 0 ? 'white' : theme.text
+                    }}>
+                      {index === 0 ? '��' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                    </div>
+                    <div style={{ fontSize: '2rem' }}>{member.avatar}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ 
+                        fontWeight: '600', 
+                        fontSize: '1.1rem',
+                        color: index === 0 ? 'white' : theme.text
+                      }}>
+                        {member.name}
+                      </div>
+                      <div style={{ 
+                        fontSize: '0.9rem',
+                        color: index === 0 ? 'rgba(255,255,255,0.9)' : theme.textSecondary
+                      }}>
+                        {member.points} points
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeFamilyMember(member.id)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: index === 0 ? 'white' : '#ef4444',
+                        fontSize: '1.5rem',
+                        cursor: 'pointer',
+                        padding: '0.5rem'
+                      }}
+                      title="Supprimer"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ajouter membre */}
+          {!showAddMember ? (
+            <button
+              onClick={() => setShowAddMember(true)}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              ➕ Ajouter un membre
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Nom du membre..."
+                value={newMemberName}
+                onChange={(e) => setNewMemberName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addFamilyMember()}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  border: `2px solid ${theme.border}`,
+                  background: theme.bg,
+                  color: theme.text,
+                  fontSize: '1rem'
+                }}
+              />
+              <button
+                onClick={addFamilyMember}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                ✓
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddMember(false);
+                  setNewMemberName('');
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CALENDRIER - Reste identique */}
       {showCalendar && (
         <div style={{ 
           background: theme.cardBg, 
@@ -695,7 +1021,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* STATISTIQUES - Reste identique */}
+      {/* STATISTIQUES - Identique */}
       {showStats && (
         <div style={{ 
           background: theme.cardBg, 
@@ -754,7 +1080,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* ZONES ET RESTE DE L'APP - Identique à avant */}
+      {/* ZONES ET TÂCHES */}
       {!selectedZone ? (
         <>
           <div style={{ 
@@ -922,19 +1248,24 @@ export default function Home() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {zoneTasks.map((task) => {
               const isCompleted = completedTasks.has(task.id);
+              const assignment = taskAssignments.find(a => a.taskId === task.id);
+              const assignedMember = assignment ? familyMembers.find(m => m.id === assignment.memberId) : null;
+              const comments = taskComments.filter(c => c.taskId === task.id);
+              
               return (
                 <div 
                   key={task.id}
-                  onClick={() => toggleTaskCompletion(task.id)}
                   style={{
                     background: isCompleted ? (darkMode ? '#1e3a1e' : '#e8f5e9') : theme.bg,
                     padding: '1rem',
                     borderRadius: '12px',
-                    cursor: 'pointer',
-                    border: isCompleted ? '2px solid #4caf50' : `2px solid ${theme.border}`
+                    border: isCompleted ? '2px solid #4caf50' : assignedMember ? `2px solid ${assignedMember.color}` : `2px solid ${theme.border}`
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'start', gap: '0.75rem' }}>
+                  <div 
+                    onClick={() => toggleTaskCompletion(task.id)}
+                    style={{ display: 'flex', alignItems: 'start', gap: '0.75rem', cursor: 'pointer' }}
+                  >
                     <div style={{
                       width: '22px',
                       height: '22px',
@@ -959,7 +1290,7 @@ export default function Home() {
                       }}>
                         {task.name}
                       </h3>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{
                           padding: '0.2rem 0.6rem',
                           background: darkMode ? '#1e3a8a' : '#e3f2fd',
@@ -982,9 +1313,117 @@ export default function Home() {
                             ⏱ {task.estimatedTime}m
                           </span>
                         )}
+                        {assignedMember && (
+                          <span style={{
+                            padding: '0.2rem 0.6rem',
+                            background: assignedMember.color,
+                            color: 'white',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            {assignedMember.avatar} {assignedMember.name}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
+
+                  {/* Actions */}
+                  <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {familyMembers.length > 0 && (
+                      <select
+                        value={assignment?.memberId || ''}
+                        onChange={(e) => assignTaskToMember(task.id, e.target.value)}
+                        style={{
+                          padding: '0.4rem 0.6rem',
+                          borderRadius: '6px',
+                          border: `2px solid ${theme.border}`,
+                          background: theme.bg,
+                          color: theme.text,
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">Assigner à...</option>
+                        {familyMembers.map(member => (
+                          <option key={member.id} value={member.id}>
+                            {member.avatar} {member.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      onClick={() => setSelectedTaskForComment(selectedTaskForComment === task.id ? null : task.id)}
+                      style={{
+                        padding: '0.4rem 0.8rem',
+                        background: comments.length > 0 ? '#3b82f6' : theme.bg,
+                        color: comments.length > 0 ? 'white' : theme.text,
+                        border: `2px solid ${theme.border}`,
+                        borderRadius: '6px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      💬 {comments.length > 0 && `(${comments.length})`}
+                    </button>
+                  </div>
+
+                  {/* Commentaires */}
+                  {selectedTaskForComment === task.id && (
+                    <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: theme.bg, borderRadius: '8px' }}>
+                      {comments.map(comment => {
+                        const member = familyMembers.find(m => m.id === comment.memberId);
+                        return (
+                          <div key={comment.id} style={{ marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: `1px solid ${theme.border}` }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.25rem', fontSize: '0.75rem', color: theme.textSecondary }}>
+                              {member && <span>{member.avatar} {member.name}</span>}
+                              <span>{new Date(comment.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: theme.text }}>{comment.comment}</div>
+                          </div>
+                        );
+                      })}
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                        <input
+                          type="text"
+                          placeholder="Ajouter un commentaire..."
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && addComment(task.id)}
+                          style={{
+                            flex: 1,
+                            padding: '0.5rem',
+                            borderRadius: '6px',
+                            border: `2px solid ${theme.border}`,
+                            background: theme.cardBg,
+                            color: theme.text,
+                            fontSize: '0.85rem'
+                          }}
+                        />
+                        <button
+                          onClick={() => addComment(task.id)}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          ➤
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
