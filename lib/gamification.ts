@@ -161,7 +161,7 @@ export function checkBadgeUnlocked(badge: Badge, stats: {
   totalPoints: number;
   currentStreak: number;
 }): boolean {
-  if (badge.id.startsWith('task-')) {
+  if (badge.id.startsWith('task-') || badge.id === 'first-task') {
     return stats.totalTasks >= badge.requirement;
   }
   if (badge.id.startsWith('streak-')) {
