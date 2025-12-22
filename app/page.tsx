@@ -1,4 +1,3 @@
-Créé avec Perplexity
 'use client';
 
 import { useEffect, useState } from 'react';
