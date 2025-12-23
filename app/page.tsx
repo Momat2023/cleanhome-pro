@@ -98,8 +98,17 @@ export default function Home() {
   const [tutorialZoneFilter, setTutorialZoneFilter] = useState<string>('all');
   
   // Firebase Family Sync
-  const firebase = useFirebaseFamily();
-  const [showFamilyModal, setShowFamilyModal] = useState(!firebase.isConnected);
+  const { 
+  familyCode: firebaseFamilyCode,
+  isConnected: firebaseIsConnected,
+  createFamily: firebaseCreateFamily,
+  joinFamily: firebaseJoinFamily,
+  disconnect: firebaseDisconnect,
+  syncData: firebaseSyncData,
+  listenToData: firebaseListenToData
+} = useFirebaseFamily();
+
+  const [showFamilyModal, setShowFamilyModal] = useState(!firebaseIsConnected);
 
 
   useEffect(() => {
@@ -288,47 +297,85 @@ export default function Home() {
     }
   }, [unlockedBadges]);
   
-// Synchronisation Firebase - ÉCOUTE SEULEMENT (pas de sync automatique)
+// ========================================
+// 🔥 FIREBASE - LISTENERS (LECTURE)
+// ========================================
+
 useEffect(() => {
-  if (!firebase.isConnected) return;
+  if (!firebaseIsConnected) return;
 
-  // Écouter les changements des membres
-  const unsubMembers = firebase.listenToData('members', (data) => {
-    if (data) {
-      const membersArray = Object.values(data) as FamilyMember[]; // ← Ajoute le cast
-      // Éviter la boucle : ne met à jour que si différent
-      if (JSON.stringify(membersArray) !== JSON.stringify(familyMembers)) {
-        setFamilyMembers(membersArray);
-      }
+  const unsubMembers = firebaseListenToData('members', (data) => {
+    if (data && Array.isArray(data) && data.length > 0) {
+      setFamilyMembers(data as FamilyMember[]);
+      console.log('📥 Members reçus:', data.length);
     }
   });
 
-  // Écouter l'historique
-  const unsubHistory = firebase.listenToData('history', (data) => {
-    if (data) {
-      const historyArray = Object.values(data) as CompletedTask[]; // ← Ajoute le cast
-      if (JSON.stringify(historyArray) !== JSON.stringify(history)) {
-        setHistory(historyArray);
-      }
+  const unsubHistory = firebaseListenToData('history', (data) => {
+    if (data && Array.isArray(data) && data.length > 0) {
+      setHistory(data as CompletedTask[]);
+      console.log('📥 History reçu:', data.length);
     }
   });
 
-  // Écouter les assignments
-  const unsubAssignments = firebase.listenToData('assignments', (data) => {
-    if (data) {
-      const assignmentsArray = Object.values(data) as TaskAssignment[]; // ← Ajoute le cast
-      if (JSON.stringify(assignmentsArray) !== JSON.stringify(taskAssignments)) {
-        setTaskAssignments(assignmentsArray);
-      }
+  const unsubAssignments = firebaseListenToData('assignments', (data) => {
+    if (data && Array.isArray(data) && data.length > 0) {
+      setTaskAssignments(data as TaskAssignment[]);
+      console.log('📥 Assignments reçus:', data.length);
+    }
+  });
+
+  const unsubComments = firebaseListenToData('comments', (data) => {
+    if (data && Array.isArray(data) && data.length > 0) {
+      setTaskComments(data as TaskComment[]);
+      console.log('📥 Comments reçus:', data.length);
     }
   });
 
   return () => {
-    unsubMembers?.();
-    unsubHistory?.();
-    unsubAssignments?.();
+    unsubMembers();
+    unsubHistory();
+    unsubAssignments();
+    unsubComments();
   };
-}, [firebase.isConnected]); // ← Dépend SEULEMENT de la connexion
+}, [firebaseIsConnected]);
+
+// ========================================
+// 🔥 FIREBASE - SYNC (ÉCRITURE)
+// ========================================
+
+useEffect(() => {
+  if (!firebaseIsConnected || familyMembers.length === 0) return;
+  const timeoutId = setTimeout(() => {
+    firebaseSyncData('members', familyMembers);
+  }, 500);
+  return () => clearTimeout(timeoutId);
+}, [familyMembers.length, firebaseIsConnected]);
+
+useEffect(() => {
+  if (!firebaseIsConnected || history.length === 0) return;
+  const timeoutId = setTimeout(() => {
+    firebaseSyncData('history', history);
+  }, 500);
+  return () => clearTimeout(timeoutId);
+}, [history.length, firebaseIsConnected]);
+
+useEffect(() => {
+  if (!firebaseIsConnected || taskAssignments.length === 0) return;
+  const timeoutId = setTimeout(() => {
+    firebaseSyncData('assignments', taskAssignments);
+  }, 500);
+  return () => clearTimeout(timeoutId);
+}, [taskAssignments.length, firebaseIsConnected]);
+
+useEffect(() => {
+  if (!firebaseIsConnected || taskComments.length === 0) return;
+  const timeoutId = setTimeout(() => {
+    firebaseSyncData('comments', taskComments);
+  }, 500);
+  return () => clearTimeout(timeoutId);
+}, [taskComments.length, firebaseIsConnected]);
+
 
 
   useEffect(() => {
@@ -997,16 +1044,16 @@ useEffect(() => {
 			  }}
 			  style={{
 				padding: '0.5rem 1rem',
-				background: firebase.isConnected ? '#10b981' : '#f59e0b',
+				background: firebaseIsConnected ? '#10b981' : '#f59e0b',
 				color: 'white',
 				border: 'none',
 				borderRadius: '8px',
 				cursor: 'pointer',
 				fontSize: '1.3rem',
 			  }}
-			  title={firebase.isConnected ? `Famille: ${firebase.familyCode}` : 'Connecter famille'}
+			  title={firebaseIsConnected ? `Famille: ${firebaseFamilyCode}` : 'Connecter famille'}
 			>
-			  {firebase.isConnected ? '🔗' : '⚠️'}
+			  {firebaseIsConnected ? '🔗' : '⚠️'}
 			</button>
 
 
@@ -2443,8 +2490,8 @@ useEffect(() => {
 	        {/* 🆕 Modale connexion famille Firebase */}
       {showFamilyModal && (
         <FamilyConnectionModal
-          onCreateFamily={firebase.createFamily}
-          onJoinFamily={firebase.joinFamily}
+          onCreateFamily={firebaseCreateFamily}
+          onJoinFamily={firebaseJoinFamily}
           onClose={() => setShowFamilyModal(false)}
         />
       )}

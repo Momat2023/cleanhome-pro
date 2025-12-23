@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ref, onValue, set, push, update } from 'firebase/database';
+import { ref, onValue, set } from 'firebase/database';
 import { database } from '@/lib/firebase/config';
 
 export function useFirebaseFamily() {
@@ -8,7 +8,6 @@ export function useFirebaseFamily() {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // Récupérer le code famille depuis localStorage
     const savedCode = localStorage.getItem('family-code');
     if (savedCode) {
       setFamilyCode(savedCode);
@@ -16,63 +15,99 @@ export function useFirebaseFamily() {
     }
   }, []);
 
-  // Créer une nouvelle famille
-  const createFamily = () => {
+  const createFamily = async () => {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const familyRef = ref(database, `families/${code}`);
     
-    set(familyRef, {
-      createdAt: new Date().toISOString(),
-      members: {},
-      tasks: {},
-      history: {}
-    }).then(() => {
+    try {
+      await set(familyRef, {
+        createdAt: new Date().toISOString(),
+        members: {},
+        history: {},
+        assignments: {},
+        comments: {}
+      });
+      
       localStorage.setItem('family-code', code);
       setFamilyCode(code);
       setIsConnected(true);
-    });
-
-    return code;
+      console.log(`✅ Famille créée: ${code}`);
+      return code;
+    } catch (error) {
+      console.error('❌ Erreur création famille:', error);
+      return null;
+    }
   };
 
-  // Rejoindre une famille existante
-  const joinFamily = (code: string) => {
-    const familyRef = ref(database, `families/${code}`);
+  const joinFamily = async (code: string) => {
+    if (!code || code.length !== 6) {
+      alert('❌ Code famille invalide');
+      return false;
+    }
+
+    const familyRef = ref(database, `families/${code.toUpperCase()}`);
     
-    onValue(familyRef, (snapshot) => {
-      if (snapshot.exists()) {
-        localStorage.setItem('family-code', code);
-        setFamilyCode(code);
-        setIsConnected(true);
-      } else {
-        alert('❌ Code famille invalide !');
-      }
-    }, { onlyOnce: true });
+    return new Promise<boolean>((resolve) => {
+      onValue(familyRef, (snapshot) => {
+        if (snapshot.exists()) {
+          localStorage.setItem('family-code', code.toUpperCase());
+          setFamilyCode(code.toUpperCase());
+          setIsConnected(true);
+          console.log(`✅ Connecté à: ${code.toUpperCase()}`);
+          resolve(true);
+        } else {
+          alert('❌ Code famille invalide !');
+          resolve(false);
+        }
+      }, { onlyOnce: true });
+    });
   };
 
-  // Se déconnecter
   const disconnect = () => {
     localStorage.removeItem('family-code');
     setFamilyCode(null);
     setIsConnected(false);
   };
 
-  // Synchroniser les données
-  const syncData = (path: string, data: any) => {
-    if (!familyCode) return;
-    const dataRef = ref(database, `families/${familyCode}/${path}`);
-    set(dataRef, data);
+  const syncData = async (path: string, data: any) => {
+    if (!familyCode || !data) return false;
+
+    try {
+      const dataRef = ref(database, `families/${familyCode}/${path}`);
+      await set(dataRef, data);
+      console.log(`📤 Synced: ${path}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Erreur sync ${path}:`, error);
+      return false;
+    }
   };
 
-  // Écouter les changements
   const listenToData = (path: string, callback: (data: any) => void) => {
-    if (!familyCode) return;
+    if (!familyCode) return () => {};
+
     const dataRef = ref(database, `families/${familyCode}/${path}`);
-    return onValue(dataRef, (snapshot) => {
+    
+    const unsubscribe = onValue(dataRef, (snapshot) => {
       if (snapshot.exists()) {
-        callback(snapshot.val());
+        const data = snapshot.val();
+        
+        // Convertir objet → array si besoin
+        if (typeof data === 'object' && !Array.isArray(data)) {
+          const dataArray = Object.entries(data).map(([key, value]) => ({
+            id: key,
+            ...value as object
+          }));
+          callback(dataArray);
+        } else {
+          callback(data);
+        }
+      } else {
+        callback([]);
       }
     });
+
+    return unsubscribe;
   };
 
   return {
