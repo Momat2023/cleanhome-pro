@@ -85,33 +85,45 @@ const syncData = async (path: string, data: any) => {
   if (!familyCode || !data) return false;
 
   try {
-    // ✅ Nettoie les données avant sync (enlève undefined)
-    const cleanData = JSON.parse(JSON.stringify(data, (key, value) => {
-      return value === undefined ? null : value;
-    }));
+    // ✅ Nettoie les undefined → null
+    const cleanData = JSON.parse(JSON.stringify(data));
     
-    // ✅ Si c'est history, filtre les items invalides
+    // ✅ Si c'est history, filtre uniquement les items vraiment invalides
     let dataToSync = cleanData;
     if (path === 'history' && Array.isArray(cleanData)) {
-      dataToSync = cleanData.filter(item => 
-        item && 
-        item.id && 
-        item.taskId !== undefined && 
-        item.memberId !== undefined &&
-        item.date
-      );
+		  // 🔍 DEBUG: Affiche le premier item
+  console.log('🔍 Premier item history:', cleanData[0]);
+  console.log('🔍 Propriétés:', {
+    id: cleanData[0]?.id,
+    taskId: cleanData[0]?.taskId,
+    memberId: cleanData[0]?.memberId,
+    date: cleanData[0]?.date
+  });
+      dataToSync = cleanData.filter(item => {
+        const isValid = item && 
+          item.id && 
+          item.taskId != null && // != null vérifie undefined ET null
+          item.memberId != null && 
+          item.date;
+        
+        if (!isValid) {
+          console.warn('⚠️ Item invalide filtré:', item);
+        }
+        return isValid;
+      });
       console.log(`🔍 History: ${cleanData.length} items → ${dataToSync.length} valides`);
     }
 
     const dataRef = ref(database, `families/${familyCode}/${path}`);
     await set(dataRef, dataToSync);
-    console.log(`📤 Synced: ${path}`);
+    console.log(`📤 Synced: ${path} (${Array.isArray(dataToSync) ? dataToSync.length : 'N/A'} items)`);
     return true;
   } catch (error) {
     console.error(`❌ Erreur sync ${path}:`, error);
     return false;
   }
 };
+
 
 
   const listenToData = (path: string, callback: (data: any) => void) => {
