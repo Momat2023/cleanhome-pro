@@ -81,19 +81,38 @@ const createFamily = async () => {
     setIsConnected(false);
   };
 
-  const syncData = async (path: string, data: any) => {
-    if (!familyCode || !data) return false;
+const syncData = async (path: string, data: any) => {
+  if (!familyCode || !data) return false;
 
-    try {
-      const dataRef = ref(database, `families/${familyCode}/${path}`);
-      await set(dataRef, data);
-      console.log(`📤 Synced: ${path}`);
-      return true;
-    } catch (error) {
-      console.error(`❌ Erreur sync ${path}:`, error);
-      return false;
+  try {
+    // ✅ Nettoie les données avant sync (enlève undefined)
+    const cleanData = JSON.parse(JSON.stringify(data, (key, value) => {
+      return value === undefined ? null : value;
+    }));
+    
+    // ✅ Si c'est history, filtre les items invalides
+    let dataToSync = cleanData;
+    if (path === 'history' && Array.isArray(cleanData)) {
+      dataToSync = cleanData.filter(item => 
+        item && 
+        item.id && 
+        item.taskId !== undefined && 
+        item.memberId !== undefined &&
+        item.date
+      );
+      console.log(`🔍 History: ${cleanData.length} items → ${dataToSync.length} valides`);
     }
-  };
+
+    const dataRef = ref(database, `families/${familyCode}/${path}`);
+    await set(dataRef, dataToSync);
+    console.log(`📤 Synced: ${path}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Erreur sync ${path}:`, error);
+    return false;
+  }
+};
+
 
   const listenToData = (path: string, callback: (data: any) => void) => {
     if (!familyCode) return () => {};
